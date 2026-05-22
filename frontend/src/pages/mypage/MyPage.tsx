@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getChatSessions } from '@/lib/chatSessions'
 import type { ChatSession } from '@/lib/chatSessions'
-import { getAnalysisHistory } from '@/lib/analysisHistory'
+import { getPhishingHistory } from '@/api/phishing'
+import { getMyReports } from '@/api/number'
+import type { RiskLevel } from '@/types/api'
 import RiskBadge from '@/components/common/RiskBadge'
-import type { LocalAnalysis } from '@/lib/analysisHistory'
 import { useAuth } from '@/contexts/AuthContext'
 import {
   Link2, Phone, Image, Mic, MessageSquare, ChevronRight, ClipboardList,
@@ -13,26 +14,46 @@ import {
 import { cn } from '@/lib/utils'
 
 type Tab = 'analysis' | 'chat'
+type AnalysisType = 'url' | 'phone' | 'image' | 'voice'
 
-const typeIcon: Record<LocalAnalysis['type'], React.ReactNode> = {
+// 마이페이지 분석 이력 표시용 통합 항목 — 서버 응답(분석 이력 + 내 신고 이력)을 화면용으로 정규화
+interface HistoryItem {
+  id: string
+  type: AnalysisType
+  target: string
+  riskLevel: RiskLevel
+  riskScore?: number
+  analyzedAt: string
+}
+
+const typeIcon: Record<AnalysisType, React.ReactNode> = {
   url:   <Link2  className="w-4 h-4 text-blue-500" />,
   phone: <Phone  className="w-4 h-4 text-emerald-500" />,
   image: <Image  className="w-4 h-4 text-violet-500" />,
   voice: <Mic    className="w-4 h-4 text-amber-500" />,
 }
 
-const typeIconBg: Record<LocalAnalysis['type'], string> = {
+const typeIconBg: Record<AnalysisType, string> = {
   url:   'bg-blue-50',
   phone: 'bg-emerald-50',
   image: 'bg-violet-50',
   voice: 'bg-amber-50',
 }
 
-const typeLabel: Record<LocalAnalysis['type'], string> = {
+const typeLabel: Record<AnalysisType, string> = {
   url:   'URL 분석',
   phone: '전화번호 조회',
   image: '이미지 분석',
   voice: '음성 분석',
+}
+
+// 전화번호 신고 횟수 → 위험 등급 (백엔드 명세 기준)
+function riskFromReportCount(count: number): RiskLevel {
+  if (count >= 10) return 'CRITICAL'
+  if (count >= 6) return 'HIGH'
+  if (count >= 3) return 'MEDIUM'
+  if (count >= 1) return 'LOW'
+  return 'SAFE'
 }
 
 function formatDate(iso: string): string {
@@ -57,8 +78,65 @@ export default function MyPage() {
   const navigate = useNavigate()
   const { user, logout } = useAuth()
   const [tab, setTab] = useState<Tab>('analysis')
-  const [analyses] = useState<LocalAnalysis[]>(() => getAnalysisHistory())
+  const [analyses, setAnalyses] = useState<HistoryItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const [sessions] = useState<ChatSession[]>(() => getChatSessions())
+
+  // 분석 이력을 서버에서 조회 — 계정 기반 (localStorage 아님)
+  useEffect(() => {
+    let cancelled = false
+
+    const load = async () => {
+      setLoading(true)
+      setError(false)
+      try {
+        // 분석 이력(URL·이미지·음성) + 내 신고 이력(전화번호)을 함께 조회
+        const [analysisRes, reportRes] = await Promise.all([
+          getPhishingHistory(),
+          getMyReports(),
+        ])
+        const items: HistoryItem[] = []
+
+        if (analysisRes.success && analysisRes.data) {
+          for (const a of analysisRes.data) {
+            items.push({
+              id: `analysis-${a.id}`,
+              // 통합 API는 type 제공, 구버전 응답은 URL만 → 'url'로 간주
+              type: a.type ? (a.type.toLowerCase() as AnalysisType) : 'url',
+              target: a.target ?? a.url ?? '',
+              riskLevel: a.riskLevel,
+              riskScore: a.riskScore,
+              analyzedAt: a.analyzedAt,
+            })
+          }
+        }
+
+        if (reportRes.success && reportRes.data) {
+          for (const r of reportRes.data) {
+            items.push({
+              id: `report-${r.phoneNumber}-${r.createdAt}`,
+              type: 'phone',
+              target: r.phoneNumber,
+              riskLevel: riskFromReportCount(r.reportCount),
+              analyzedAt: r.createdAt,
+            })
+          }
+        }
+
+        // 최신순 정렬
+        items.sort((x, y) => y.analyzedAt.localeCompare(x.analyzedAt))
+        if (!cancelled) setAnalyses(items)
+      } catch {
+        if (!cancelled) setError(true)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    load()
+    return () => { cancelled = true }
+  }, [])
 
   const handleLogout = async () => {
     await logout()
@@ -128,7 +206,16 @@ export default function MyPage() {
 
       {/* 분석 이력 */}
       {tab === 'analysis' && (
-        analyses.length === 0 ? (
+        loading ? (
+          <div className="flex flex-col items-center justify-center py-14 text-center">
+            <p className="text-sm text-slate-400">이력을 불러오는 중...</p>
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-14 text-center">
+            <p className="text-sm font-semibold text-slate-500">이력을 불러오지 못했습니다</p>
+            <p className="text-xs text-slate-400 mt-1">잠시 후 다시 시도해 주세요</p>
+          </div>
+        ) : analyses.length === 0 ? (
           <EmptyState
             icon={<ClipboardList className="w-7 h-7 text-slate-300" />}
             message="분석 이력이 없습니다"

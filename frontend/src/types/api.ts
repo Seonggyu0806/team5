@@ -28,12 +28,18 @@ export interface PhishingAnalyzeResult {
   recommendation: string
 }
 
-// ─── 분석 이력 ───────────────────────────────────────────────
+// ─── 분석 이력 (통합) ─────────────────────────────────────────
+// 통합 이력 API(GET /api/v1/analysis/history)는 type·target을 포함해
+// URL·이미지·음성 분석 이력을 모두 반환한다.
+// 구버전 응답(url 필드만 존재)도 호환되도록 신규 필드는 옵셔널로 둔다.
 export interface PhishingHistory {
   id: number
-  url: string
-  riskScore: number
+  type?: 'URL' | 'IMAGE' | 'VOICE' // 분석 종류 (구버전 응답엔 없음 → URL로 간주)
+  target?: string                  // 분석 대상 (URL 주소 / 이미지·음성 파일명)
+  url?: string                     // 구버전 호환 (URL 분석)
+  riskScore?: number               // 이미지·음성은 점수가 없을 수 있음
   riskLevel: RiskLevel
+  phishingType?: string
   analyzedAt: string
 }
 
