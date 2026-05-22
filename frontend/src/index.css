@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+:root {
+  --color-safe: #22c55e;
+  --color-low: #84cc16;
+  --color-medium: #f59e0b;
+  --color-high: #f97316;
+  --color-critical: #ef4444;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-slide-in {
+  animation: fadeSlideIn 0.2s ease-out;
+}
+
+body {
+  margin: 0;
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background-color: #f8fafc;
+  color: #1e293b;
+}
+
+#root {
+  min-height: 100vh;
+}
