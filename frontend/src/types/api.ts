@@ -140,6 +140,33 @@ export interface AdminLoginResult {
   adminId: string
 }
 
+// ─── 관리자 — 전체 신고 목록 (GET /admin/reports) ──────────────
+export interface AdminReportItem {
+  phoneNumber: string
+  reportCount: number
+  riskLevel: RiskLevel
+  createdAt: string
+  updatedAt: string
+}
+
+// ─── 관리자 — 전체 유저 목록 (GET /admin/users) ────────────────
+export interface AdminUserItem {
+  id: number
+  email: string
+  nickname: string
+  createdAt: string
+}
+
+// ─── 관리자 — 전체 URL 분석 목록 (GET /admin/urls) ─────────────
+export interface AdminUrlItem {
+  id: number
+  userId: number
+  url: string
+  isMalicious: boolean
+  details: string
+  timestamp: string
+}
+
 // ─── 사용자 인증 ─────────────────────────────────────────────
 export interface UserRegisterRequest {
   email: string
