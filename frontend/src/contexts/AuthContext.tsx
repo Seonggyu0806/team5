@@ -54,8 +54,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = async () => {
-    await userLogout()
-    setUser(null)
+    try {
+      await userLogout()
+    } finally {
+      // 서버 로그아웃 요청의 성공/실패와 무관하게 항상 로컬 토큰 삭제
+      setUser(null)
+    }
   }
 
   const register = async (nickname: string, email: string, password: string) => {
