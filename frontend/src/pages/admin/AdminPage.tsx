@@ -1,6 +1,8 @@
-import { useState } from 'react'
-import { Shield, Loader2, Eye, EyeOff, LogOut, BarChart2, ShieldAlert, Phone, TrendingUp } from 'lucide-react'
-import { adminLogin, adminLogout } from '@/api/admin'
+import { useState, useEffect } from 'react'
+import { Shield, Loader2, Eye, EyeOff, LogOut, Users, Phone, Link2, ShieldAlert } from 'lucide-react'
+import { adminLogin, adminLogout, getAdminReports, getAdminUsers, getAdminUrls } from '@/api/admin'
+import type { AdminReportItem, AdminUserItem, AdminUrlItem } from '@/types/api'
+import RiskBadge from '@/components/common/RiskBadge'
 
 interface AdminUser {
   adminId: string
@@ -118,22 +120,78 @@ function AdminLoginForm({ onSuccess }: { onSuccess: (user: AdminUser) => void })
 }
 
 // ─── 관리자 대시보드 ───────────────────────────────────────────
-const stats = [
-  { icon: TrendingUp,  label: '총 분석 건수',  value: '1,248건', color: 'text-blue-400',   bg: 'bg-blue-900/30' },
-  { icon: ShieldAlert, label: '피싱 탐지',     value: '312건',   color: 'text-red-400',    bg: 'bg-red-900/30' },
-  { icon: Phone,       label: '신고 번호',      value: '89건',    color: 'text-orange-400', bg: 'bg-orange-900/30' },
-  { icon: BarChart2,   label: '오늘 분석',      value: '40건',    color: 'text-green-400',  bg: 'bg-green-900/30' },
+type AdminTab = 'reports' | 'users' | 'urls'
+
+const TABS: { key: AdminTab; label: string }[] = [
+  { key: 'reports', label: '신고 목록' },
+  { key: 'users',   label: '유저 목록' },
+  { key: 'urls',    label: 'URL 분석' },
 ]
 
+// ISO 문자열 → "2026-05-22 12:00"
+function formatDateTime(iso: string): string {
+  try {
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return iso
+    const p = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+  } catch {
+    return iso
+  }
+}
+
 function AdminDashboard({ adminId, onLogout }: { adminId: string; onLogout: () => void }) {
-  const [loading, setLoading] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
+  const [tab, setTab] = useState<AdminTab>('reports')
+
+  const [reports, setReports] = useState<AdminReportItem[]>([])
+  const [users, setUsers] = useState<AdminUserItem[]>([])
+  const [urls, setUrls] = useState<AdminUrlItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
+
+  // 신고·유저·URL 목록을 한 번에 조회
+  useEffect(() => {
+    let cancelled = false
+
+    const load = async () => {
+      setLoading(true)
+      setError(false)
+      try {
+        const [reportRes, userRes, urlRes] = await Promise.all([
+          getAdminReports(),
+          getAdminUsers(),
+          getAdminUrls(),
+        ])
+        if (cancelled) return
+        if (reportRes.success && reportRes.data) setReports(reportRes.data)
+        if (userRes.success && userRes.data) setUsers(userRes.data)
+        if (urlRes.success && urlRes.data) setUrls(urlRes.data)
+      } catch {
+        if (!cancelled) setError(true)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    load()
+    return () => { cancelled = true }
+  }, [])
 
   const handleLogout = async () => {
-    setLoading(true)
+    setLoggingOut(true)
     await adminLogout()
     onLogout()
-    setLoading(false)
   }
+
+  const maliciousCount = urls.filter((u) => u.isMalicious).length
+
+  const stats = [
+    { icon: Users,       label: '총 유저',    value: users.length,   color: 'text-blue-400',   bg: 'bg-blue-900/30' },
+    { icon: Phone,       label: '신고 번호',  value: reports.length, color: 'text-orange-400', bg: 'bg-orange-900/30' },
+    { icon: Link2,       label: 'URL 분석',   value: urls.length,    color: 'text-green-400',  bg: 'bg-green-900/30' },
+    { icon: ShieldAlert, label: '악성 URL',   value: maliciousCount, color: 'text-red-400',    bg: 'bg-red-900/30' },
+  ]
 
   return (
     <div className="min-h-screen bg-slate-900 px-4 py-6">
@@ -148,10 +206,10 @@ function AdminDashboard({ adminId, onLogout }: { adminId: string; onLogout: () =
             <span className="text-sm text-slate-400">{adminId}</span>
             <button
               onClick={handleLogout}
-              disabled={loading}
+              disabled={loggingOut}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700 text-slate-300 text-xs hover:bg-slate-600 transition-colors disabled:opacity-50"
             >
-              {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogOut className="w-3.5 h-3.5" />}
+              {loggingOut ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LogOut className="w-3.5 h-3.5" />}
               로그아웃
             </button>
           </div>
@@ -165,21 +223,136 @@ function AdminDashboard({ adminId, onLogout }: { adminId: string; onLogout: () =
                 <Icon className={`w-4 h-4 ${color}`} />
               </div>
               <p className="text-xs text-slate-400">{label}</p>
-              <p className="text-xl font-bold text-white mt-0.5">{value}</p>
+              <p className="text-xl font-bold text-white mt-0.5">{loading ? '–' : value}</p>
             </div>
           ))}
         </div>
 
-        {/* 안내 */}
-        <div className="bg-slate-800 rounded-2xl border border-slate-700 p-4">
-          <p className="text-sm font-semibold text-slate-300 mb-2">관리자 기능 안내</p>
-          <ul className="space-y-1.5 text-xs text-slate-500">
-            <li>• 신고 번호 관리 기능은 백엔드 연동 후 추가 예정</li>
-            <li>• 사용자 관리 기능은 백엔드 연동 후 추가 예정</li>
-            <li>• 현재 통계는 Mock 데이터 기준입니다</li>
-          </ul>
+        {/* 탭 */}
+        <div className="flex bg-slate-800 rounded-xl p-1 gap-1 border border-slate-700">
+          {TABS.map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${
+                tab === key ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* 목록 */}
+        <div className="space-y-2.5">
+          {loading ? (
+            <div className="flex items-center justify-center py-14 text-sm text-slate-500">
+              <Loader2 className="w-4 h-4 animate-spin mr-2" />불러오는 중...
+            </div>
+          ) : error ? (
+            <div className="py-14 text-center">
+              <p className="text-sm font-semibold text-slate-400">목록을 불러오지 못했습니다</p>
+              <p className="text-xs text-slate-500 mt-1">잠시 후 다시 시도해 주세요</p>
+            </div>
+          ) : tab === 'reports' ? (
+            <ReportList items={reports} />
+          ) : tab === 'users' ? (
+            <UserList items={users} />
+          ) : (
+            <UrlList items={urls} />
+          )}
         </div>
       </div>
     </div>
+  )
+}
+
+// ─── 목록 컴포넌트 ─────────────────────────────────────────────
+function EmptyRow({ message }: { message: string }) {
+  return (
+    <div className="py-14 text-center text-sm text-slate-500">{message}</div>
+  )
+}
+
+function ReportList({ items }: { items: AdminReportItem[] }) {
+  if (items.length === 0) return <EmptyRow message="신고된 번호가 없습니다" />
+  return (
+    <>
+      {items.map((r) => (
+        <div key={r.phoneNumber} className="bg-slate-800 rounded-2xl border border-slate-700 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-orange-900/30 flex items-center justify-center shrink-0">
+                <Phone className="w-4 h-4 text-orange-400" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-white truncate">{r.phoneNumber}</p>
+                <p className="text-xs text-slate-500 mt-0.5">신고 {r.reportCount}회</p>
+              </div>
+            </div>
+            <RiskBadge level={r.riskLevel} size="sm" />
+          </div>
+          <p className="text-xs text-slate-500 mt-3 pt-3 border-t border-slate-700">
+            최초 신고 {formatDateTime(r.createdAt)} · 최근 {formatDateTime(r.updatedAt)}
+          </p>
+        </div>
+      ))}
+    </>
+  )
+}
+
+function UserList({ items }: { items: AdminUserItem[] }) {
+  if (items.length === 0) return <EmptyRow message="가입한 유저가 없습니다" />
+  return (
+    <>
+      {items.map((u) => (
+        <div key={u.id} className="bg-slate-800 rounded-2xl border border-slate-700 p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-900/30 flex items-center justify-center shrink-0 text-blue-300 text-sm font-bold">
+              {u.nickname.charAt(0).toUpperCase()}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-white truncate">{u.nickname}</p>
+              <p className="text-xs text-slate-400 truncate">{u.email}</p>
+            </div>
+            <span className="text-xs text-slate-600 shrink-0">#{u.id}</span>
+          </div>
+          <p className="text-xs text-slate-500 mt-3 pt-3 border-t border-slate-700">
+            가입 {formatDateTime(u.createdAt)}
+          </p>
+        </div>
+      ))}
+    </>
+  )
+}
+
+function UrlList({ items }: { items: AdminUrlItem[] }) {
+  if (items.length === 0) return <EmptyRow message="URL 분석 기록이 없습니다" />
+  return (
+    <>
+      {items.map((u) => (
+        <div key={u.id} className="bg-slate-800 rounded-2xl border border-slate-700 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-green-900/30 flex items-center justify-center shrink-0">
+                <Link2 className="w-4 h-4 text-green-400" />
+              </div>
+              <p className="text-sm font-medium text-white truncate">{u.url}</p>
+            </div>
+            <span
+              className={`text-xs font-semibold px-2 py-0.5 rounded-full shrink-0 ${
+                u.isMalicious ? 'bg-red-900/40 text-red-300' : 'bg-emerald-900/40 text-emerald-300'
+              }`}
+            >
+              {u.isMalicious ? '악성' : '정상'}
+            </span>
+          </div>
+          <p className="text-xs text-slate-400 mt-2">{u.details}</p>
+          <p className="text-xs text-slate-500 mt-3 pt-3 border-t border-slate-700">
+            유저 #{u.userId} · {formatDateTime(u.timestamp)}
+          </p>
+        </div>
+      ))}
+    </>
   )
 }
