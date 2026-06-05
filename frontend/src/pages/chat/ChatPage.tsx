@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { Send, Loader2, ArrowLeft, ThumbsUp, ThumbsDown } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { sendChat } from '@/api/chat'
+import { sendChat, getConversationHistory } from '@/api/chat'
 import logoSvg from '@/assets/logo.png'
-import { getChatSession, updateChatSessionMessages } from '@/lib/chatSessions'
+import { updateChatSessionMessages } from '@/lib/chatSessions'
 import RiskBadge from '@/components/common/RiskBadge'
 import type { RiskLevel } from '@/types/api'
 import type { UIMessage } from '@/types/chat'
@@ -23,28 +23,39 @@ export default function ChatPage() {
   const { feedbackMap, handleFeedback } = useFeedback()
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  // localStorage에서 대화 이력 불러오기
+  // 서버에서 대화 이력 불러오기 (계정 기반 — 다른 기기에서도 복원됨)
   useEffect(() => {
     if (!sessionId) {
       navigate('/mypage', { replace: true })
       return
     }
 
-    const session = getChatSession(sessionId)
-    if (session) {
-      const msgs = session.messages ?? []
-      setMessages(
-        msgs.map((m, i) => ({
-          id: m.role === 'assistant' ? `assistant-${i}` : `user-${i}`,
-          role: m.role,
-          content: m.content,
-          riskLevel: i === 0 ? session.riskLevel : undefined,
-          // 과거 이력 메시지는 chatMessageId가 없음(localStorage 미저장) → 피드백 버튼 미표시
-        }))
-      )
-      setRiskLevel(session.riskLevel)
+    let cancelled = false
+    const load = async () => {
+      try {
+        const res = await getConversationHistory(sessionId)
+        if (cancelled) return
+        if (res.success && res.data) {
+          const msgs = res.data.messages ?? []
+          setMessages(
+            msgs.map((m, i) => ({
+              id: m.role === 'assistant' ? `assistant-${i}` : `user-${i}`,
+              role: m.role,
+              content: m.content,
+              riskLevel: i === 0 ? res.data!.riskLevel : undefined,
+              // 과거 이력 메시지는 chatMessageId가 없음 → 피드백 버튼 미표시
+            }))
+          )
+          setRiskLevel(res.data.riskLevel ?? null)
+        }
+      } catch {
+        // 조회 실패 시 빈 상태로 둠 ('대화 내용이 없습니다' 표시)
+      } finally {
+        if (!cancelled) setHistoryLoading(false)
+      }
     }
-    setHistoryLoading(false)
+    load()
+    return () => { cancelled = true }
   }, [sessionId, navigate])
 
   useEffect(() => {

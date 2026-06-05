@@ -1,4 +1,7 @@
-import type { ApiResponse, ChatResponse, ConversationHistory, ChatFeedbackRequest } from '@/types/api'
+import type {
+  ApiResponse, ChatResponse, ConversationHistory, ChatFeedbackRequest, ChatSessionSummary,
+} from '@/types/api'
+import { getChatSessions, getChatSession } from '@/lib/chatSessions'
 
 const phishingReplies = [
   {
@@ -44,18 +47,41 @@ export const mockSendChat = async (message: string, sessionId: string): Promise<
   }
 }
 
+// 개발 모드: localStorage에 저장된 세션 목록을 서버 응답 형태로 반환
+// (실서비스에서는 백엔드 GET /chat/sessions가 계정 기반 목록을 제공)
+export const mockGetChatSessionList = async (): Promise<ApiResponse<ChatSessionSummary[]>> => {
+  await new Promise((r) => setTimeout(r, 400))
+
+  const sessions = getChatSessions()
+  return {
+    success: true,
+    message: '성공했습니다',
+    data: sessions.map((s) => ({
+      sessionId: s.sessionId,
+      type: s.type,
+      riskLevel: s.riskLevel,
+      preview: s.preview,
+      createdAt: s.createdAt,
+    })),
+  }
+}
+
+// 개발 모드: localStorage의 해당 세션 메시지를 서버 응답 형태로 반환
 export const mockGetConversationHistory = async (sessionId: string): Promise<ApiResponse<ConversationHistory>> => {
-  await new Promise((r) => setTimeout(r, 500))
+  await new Promise((r) => setTimeout(r, 400))
+
+  const session = getChatSession(sessionId)
+  if (!session) {
+    return { success: false, message: '세션을 찾을 수 없습니다', data: null }
+  }
 
   return {
     success: true,
     message: '성공했습니다',
     data: {
       sessionId,
-      messages: [
-        { role: 'user', content: '이 번호 피싱이야?', createdAt: '2026-03-13 19:41:25' },
-        { role: 'assistant', content: '피싱번호로 등록된 기록이 있습니다. 절대 개인정보를 제공하지 마세요.', createdAt: '2026-03-13 19:41:26' },
-      ],
+      riskLevel: session.riskLevel,
+      messages: session.messages.map((m) => ({ role: m.role, content: m.content, createdAt: '' })),
     },
   }
 }

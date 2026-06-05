@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getChatSessions } from '@/lib/chatSessions'
-import type { ChatSession } from '@/lib/chatSessions'
 import { getPhishingHistory } from '@/api/phishing'
 import { getMyReports } from '@/api/number'
-import type { RiskLevel } from '@/types/api'
+import { getChatSessionList } from '@/api/chat'
+import type { RiskLevel, ChatSessionSummary } from '@/types/api'
 import RiskBadge from '@/components/common/RiskBadge'
 import { useAuth } from '@/contexts/AuthContext'
 import {
@@ -79,9 +78,9 @@ export default function MyPage() {
   const { user, logout } = useAuth()
   const [tab, setTab] = useState<Tab>('analysis')
   const [analyses, setAnalyses] = useState<HistoryItem[]>([])
+  const [sessions, setSessions] = useState<ChatSessionSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
-  const [sessions] = useState<ChatSession[]>(() => getChatSessions())
 
   // 분석 이력을 서버에서 조회 — 계정 기반 (localStorage 아님)
   useEffect(() => {
@@ -91,10 +90,11 @@ export default function MyPage() {
       setLoading(true)
       setError(false)
       try {
-        // 분석 이력(URL·이미지·음성) + 내 신고 이력(전화번호)을 함께 조회
-        const [analysisRes, reportRes] = await Promise.all([
+        // 분석 이력(URL·이미지·음성) + 내 신고 이력(전화번호) + 대화 세션 목록을 함께 조회
+        const [analysisRes, reportRes, sessionRes] = await Promise.all([
           getPhishingHistory(),
           getMyReports(),
+          getChatSessionList(),
         ])
         const items: HistoryItem[] = []
 
@@ -126,7 +126,10 @@ export default function MyPage() {
 
         // 최신순 정렬
         items.sort((x, y) => y.analyzedAt.localeCompare(x.analyzedAt))
-        if (!cancelled) setAnalyses(items)
+        if (!cancelled) {
+          setAnalyses(items)
+          if (sessionRes.success && sessionRes.data) setSessions(sessionRes.data)
+        }
       } catch {
         if (!cancelled) setError(true)
       } finally {
@@ -253,7 +256,16 @@ export default function MyPage() {
 
       {/* 대화 이력 */}
       {tab === 'chat' && (
-        sessions.length === 0 ? (
+        loading ? (
+          <div className="flex flex-col items-center justify-center py-14 text-center">
+            <p className="text-sm text-slate-400">이력을 불러오는 중...</p>
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-14 text-center">
+            <p className="text-sm font-semibold text-slate-500">이력을 불러오지 못했습니다</p>
+            <p className="text-xs text-slate-400 mt-1">잠시 후 다시 시도해 주세요</p>
+          </div>
+        ) : sessions.length === 0 ? (
           <EmptyState
             icon={<MessageSquare className="w-7 h-7 text-slate-300" />}
             message="대화 이력이 없습니다"
@@ -285,24 +297,9 @@ export default function MyPage() {
                   </div>
                 </div>
 
-                {(s.messages ?? []).length > 0 && (
-                  <div className="mt-3 pt-3 border-t border-slate-50 space-y-1">
-                    {(s.messages ?? []).slice(0, 2).map((m, i) => (
-                      <p key={`${s.sessionId}-msg-${i}`} className="text-xs text-slate-400 truncate flex items-center gap-1.5">
-                        <span className={cn(
-                          'text-[10px] font-semibold px-1.5 py-0.5 rounded-full shrink-0',
-                          m.role === 'user'
-                            ? 'bg-blue-50 text-blue-500'
-                            : 'bg-slate-100 text-slate-500'
-                        )}>
-                          {m.role === 'user' ? '나' : 'AI'}
-                        </span>
-                        {m.content.split('\n')[0]}
-                      </p>
-                    ))}
-                    {(s.messages ?? []).length > 2 && (
-                      <p className="text-xs text-slate-300">+{(s.messages ?? []).length - 2}개 메시지 더</p>
-                    )}
+                {s.preview && (
+                  <div className="mt-3 pt-3 border-t border-slate-50">
+                    <p className="text-xs text-slate-400 truncate">{s.preview}</p>
                   </div>
                 )}
               </button>
