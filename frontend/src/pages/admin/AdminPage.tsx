@@ -180,8 +180,13 @@ function AdminDashboard({ adminId, onLogout }: { adminId: string; onLogout: () =
 
   const handleLogout = async () => {
     setLoggingOut(true)
-    await adminLogout()
-    onLogout()
+    try {
+      await adminLogout()
+    } finally {
+      // 서버 요청 실패와 무관하게 항상 로그아웃 처리 + 버튼 상태 복구
+      setLoggingOut(false)
+      onLogout()
+    }
   }
 
   const maliciousCount = urls.filter((u) => u.isMalicious).length
