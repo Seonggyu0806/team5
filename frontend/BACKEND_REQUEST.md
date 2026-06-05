@@ -120,14 +120,29 @@ GET /api/v1/chat/sessions   (로그인 필요)
 }
 ```
 
-### (B) 세션 생성 시 메타데이터(type·riskLevel) 저장
+### (B) 세션 생성 시 메타데이터(type·riskLevel) 저장 — ✅ 채택·프론트 적용 완료
 
-위 (A)가 `type`·`riskLevel`·`preview`를 돌려주려면, 백엔드가 세션을 만들 때 이 메타데이터를 함께
-저장해야 합니다. 현재 `POST /api/v1/chat` 요청은 `{ sessionId, message }`만 보내므로, 다음 중 하나가 필요합니다.
-- (권장) 진단 API(`/analysis/*`, `/reports/phone/{n}`)가 세션을 만들고 그 진단의 type·riskLevel을 세션에 기록
-- 또는 `POST /chat` 첫 호출 시 type·riskLevel을 함께 받도록 파라미터 확장 (프론트가 전송 가능)
+**`POST /api/v1/chat` 요청에서 type·riskLevel을 함께 받아 세션에 저장**하는 방식으로 확정했고,
+프론트는 진단 직후 챗 호출 시 아래 형태로 전송하도록 적용했습니다.
 
-→ 어느 방식이 백엔드 구조에 맞는지 알려주시면 프론트를 맞추겠습니다.
+**변경된 요청 body**
+```json
+{
+  "sessionId": "url-1718...",
+  "message": "이거 어떻게 신고해?",
+  "type": "url",          // ← 추가: 진단 종류 (url / phone / image / voice, 소문자)
+  "riskLevel": "HIGH"     // ← 추가: 위험 등급 (SAFE/LOW/MEDIUM/HIGH/CRITICAL)
+}
+```
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| type | String | 진단 종류 — `url` / `phone` / `image` / `voice` (소문자) |
+| riskLevel | String | 위험 등급 — SAFE/LOW/MEDIUM/HIGH/CRITICAL |
+
+> 백엔드는 세션 최초 생성 시 이 값을 저장해 (A) `/chat/sessions` 응답의 `type`·`riskLevel`로 반환하면 됩니다.
+> (기존 세션을 이어가는 호출에는 type·riskLevel이 없을 수 있으니, **세션 생성 시점에만** 반영하면 됩니다.)
+> 백엔드가 기대하는 필드명/형식이 위와 다르면 알려주세요 — 프론트를 맞추겠습니다.
 
 ### (C) 대화 이력 조회 응답에 `riskLevel` 추가
 

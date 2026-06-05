@@ -5,7 +5,7 @@
 // sendFeedback           : AI 답변에 대한 도움 여부 평가 (POST /api/v1/chat/feedback)
 
 import type {
-  ApiResponse, ChatResponse, ConversationHistory, ChatFeedbackRequest, ChatSessionSummary,
+  ApiResponse, ChatResponse, ConversationHistory, ChatFeedbackRequest, ChatSessionSummary, RiskLevel,
 } from '@/types/api'
 import apiClient from './client'
 import {
@@ -15,10 +15,15 @@ import {
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
 // AI에게 메시지 전송 — reply(응답 텍스트)와 riskLevel 반환
-export const sendChat = async (sessionId: string, message: string): Promise<ApiResponse<ChatResponse>> => {
+// meta: 세션 최초 생성 시 진단 종류·위험등급을 함께 전송 → 백엔드가 세션에 저장(B방식)
+export const sendChat = async (
+  sessionId: string,
+  message: string,
+  meta?: { type: 'url' | 'phone' | 'image' | 'voice'; riskLevel: RiskLevel },
+): Promise<ApiResponse<ChatResponse>> => {
   if (USE_MOCK) return mockSendChat(message, sessionId)
 
-  const res = await apiClient.post<ApiResponse<ChatResponse>>('/chat', { sessionId, message })
+  const res = await apiClient.post<ApiResponse<ChatResponse>>('/chat', { sessionId, message, ...meta })
   return res.data
 }
 
