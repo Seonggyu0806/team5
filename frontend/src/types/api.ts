@@ -170,7 +170,7 @@ export interface AdminReportItem {
 export interface AdminUserItem {
   id: number
   email: string
-  nickname: string
+  name: string  // 백엔드 응답 필드명은 name (회원가입의 nickname이 여기로 옴)
   createdAt: string
 }
 
