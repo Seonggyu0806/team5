@@ -21,7 +21,6 @@ export default function ChatPage() {
   const [historyLoading, setHistoryLoading] = useState(true)
   const [riskLevel, setRiskLevel] = useState<RiskLevel | null>(null)
   const { feedbackMap, handleFeedback } = useFeedback()
-  const aiMessageCountRef = useRef(0)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   // localStorage에서 대화 이력 불러오기
@@ -34,17 +33,15 @@ export default function ChatPage() {
     const session = getChatSession(sessionId)
     if (session) {
       const msgs = session.messages ?? []
-      let aiIdx = 0
       setMessages(
         msgs.map((m, i) => ({
-          id: m.role === 'assistant' ? `assistant-${aiIdx}` : `user-${i}`,
+          id: m.role === 'assistant' ? `assistant-${i}` : `user-${i}`,
           role: m.role,
           content: m.content,
           riskLevel: i === 0 ? session.riskLevel : undefined,
-          messageIndex: m.role === 'assistant' ? aiIdx++ : undefined,
+          // 과거 이력 메시지는 chatMessageId가 없음(localStorage 미저장) → 피드백 버튼 미표시
         }))
       )
-      aiMessageCountRef.current = aiIdx
       setRiskLevel(session.riskLevel)
     }
     setHistoryLoading(false)
@@ -66,10 +63,14 @@ export default function ChatPage() {
     try {
       const res = await sendChat(sessionId, text)
       if (res.success && res.data) {
-        const newIdx = aiMessageCountRef.current++
         const updated: UIMessage[] = [
           ...newMessages,
-          { id: `assistant-${newIdx}`, role: 'assistant', content: res.data.reply, messageIndex: newIdx },
+          {
+            id: `assistant-${Date.now()}`,
+            role: 'assistant',
+            content: res.data.reply,
+            chatMessageId: res.data.chatMessageId, // 백엔드가 줄 때만 존재 → 있을 때만 피드백 버튼 표시
+          },
         ]
         setMessages(updated)
         setRiskLevel(res.data.riskLevel)
@@ -182,27 +183,27 @@ export default function ChatPage() {
                   )}
                   {msg.content}
                 </div>
-                {/* AI 메시지 평가 버튼 */}
-                {msg.role === 'assistant' && msg.messageIndex !== undefined && (
+                {/* AI 메시지 평가 버튼 — 서버 chatMessageId가 있을 때만 표시 */}
+                {msg.role === 'assistant' && msg.chatMessageId !== undefined && (
                   <div className="flex items-center gap-1 pl-1">
-                    {feedbackMap[msg.messageIndex] === 'loading' ? (
+                    {feedbackMap[msg.chatMessageId] === 'loading' ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-                    ) : feedbackMap[msg.messageIndex] ? (
+                    ) : feedbackMap[msg.chatMessageId] ? (
                       <span className="text-xs text-slate-400">
-                        {feedbackMap[msg.messageIndex] === 'helpful' ? '👍 도움이 됐어요' : '👎 도움이 안됐어요'}
+                        {feedbackMap[msg.chatMessageId] === 'helpful' ? '👍 도움이 됐어요' : '👎 도움이 안됐어요'}
                       </span>
                     ) : (
                       <>
                         <span className="text-xs text-slate-400 mr-1">도움이 됐나요?</span>
                         <button
-                          onClick={() => handleFeedback(msg.messageIndex!, true)}
+                          onClick={() => handleFeedback(msg.chatMessageId!, true)}
                           className="p-1 rounded-full hover:bg-green-50 text-slate-400 hover:text-green-500 transition-colors"
                           title="도움이 됐어요"
                         >
                           <ThumbsUp className="w-3.5 h-3.5" />
                         </button>
                         <button
-                          onClick={() => handleFeedback(msg.messageIndex!, false)}
+                          onClick={() => handleFeedback(msg.chatMessageId!, false)}
                           className="p-1 rounded-full hover:bg-red-50 text-slate-400 hover:text-red-400 transition-colors"
                           title="도움이 안됐어요"
                         >

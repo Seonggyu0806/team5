@@ -53,6 +53,9 @@ export interface ChatResponse {
   sessionId: string
   reply: string
   riskLevel: RiskLevel
+  // AI 답변의 서버 고유 ID — 피드백 평가(POST /chat/feedback)의 chatMessageId로 사용.
+  // 백엔드가 응답에 포함해야 피드백이 정확한 답변에 매핑됨. 없으면 프론트는 피드백 버튼을 숨김.
+  chatMessageId?: number
 }
 
 // ─── 솔루션 평가 ─────────────────────────────────────────────

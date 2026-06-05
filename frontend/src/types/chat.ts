@@ -7,5 +7,7 @@ export interface UIMessage {
   role: 'user' | 'assistant'
   content: string
   riskLevel?: RiskLevel
-  messageIndex?: number // AI 메시지 순번 (피드백 평가용)
+  // AI 답변의 서버 고유 ID (피드백 평가용). 백엔드가 응답에 chatMessageId를 줄 때만 존재.
+  // 없으면(과거 이력·분석 결과 메시지 등) 피드백 버튼을 표시하지 않는다.
+  chatMessageId?: number
 }

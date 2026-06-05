@@ -25,12 +25,12 @@ export default function DiagnosisChatInterface({
   onReset,
 }: DiagnosisChatInterfaceProps) {
   const [messages, setMessages] = useState<UIMessage[]>([
-    { id: 'assistant-0', role: 'assistant', content: initialMessage, riskLevel, messageIndex: 0 },
+    // 첫 메시지는 분석 결과 요약(AI 챗봇 답변이 아님) → chatMessageId 없음 → 피드백 버튼 미표시
+    { id: 'assistant-0', role: 'assistant', content: initialMessage, riskLevel },
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const { feedbackMap, handleFeedback } = useFeedback()
-  const aiMessageCountRef = useRef(1)   // 첫 메시지(0)는 초기화 시 이미 할당
   const bottomRef = useRef<HTMLDivElement>(null)
   const isInitialRender = useRef(true)
 
@@ -75,10 +75,15 @@ export default function DiagnosisChatInterface({
     try {
       const res = await sendChat(sessionId, text)
       if (res.success && res.data) {
-        const newIdx = aiMessageCountRef.current++
         setMessages((prev) => [
           ...prev,
-          { id: `assistant-${newIdx}`, role: 'assistant', content: res.data!.reply, riskLevel: res.data!.riskLevel, messageIndex: newIdx },
+          {
+            id: `assistant-${Date.now()}`,
+            role: 'assistant',
+            content: res.data!.reply,
+            riskLevel: res.data!.riskLevel,
+            chatMessageId: res.data!.chatMessageId, // 백엔드가 줄 때만 존재 → 있을 때만 피드백 버튼 표시
+          },
         ])
       }
     } catch {
@@ -147,27 +152,27 @@ export default function DiagnosisChatInterface({
                 )}
                 {msg.content}
               </div>
-              {/* AI 메시지 평가 버튼 */}
-              {msg.role === 'assistant' && msg.messageIndex !== undefined && (
+              {/* AI 메시지 평가 버튼 — 서버 chatMessageId가 있을 때만 표시 */}
+              {msg.role === 'assistant' && msg.chatMessageId !== undefined && (
                 <div className="flex items-center gap-1 pl-1">
-                  {feedbackMap[msg.messageIndex] === 'loading' ? (
+                  {feedbackMap[msg.chatMessageId] === 'loading' ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-400" />
-                  ) : feedbackMap[msg.messageIndex] ? (
+                  ) : feedbackMap[msg.chatMessageId] ? (
                     <span className="text-xs text-slate-400">
-                      {feedbackMap[msg.messageIndex] === 'helpful' ? '👍 도움이 됐어요' : '👎 도움이 안됐어요'}
+                      {feedbackMap[msg.chatMessageId] === 'helpful' ? '👍 도움이 됐어요' : '👎 도움이 안됐어요'}
                     </span>
                   ) : (
                     <>
                       <span className="text-xs text-slate-400 mr-1">도움이 됐나요?</span>
                       <button
-                        onClick={() => handleFeedback(msg.messageIndex!, true)}
+                        onClick={() => handleFeedback(msg.chatMessageId!, true)}
                         className="p-1 rounded-full hover:bg-green-50 text-slate-400 hover:text-green-500 transition-colors"
                         title="도움이 됐어요"
                       >
                         <ThumbsUp className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => handleFeedback(msg.messageIndex!, false)}
+                        onClick={() => handleFeedback(msg.chatMessageId!, false)}
                         className="p-1 rounded-full hover:bg-red-50 text-slate-400 hover:text-red-400 transition-colors"
                         title="도움이 안됐어요"
                       >
