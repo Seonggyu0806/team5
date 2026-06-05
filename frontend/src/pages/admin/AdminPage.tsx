@@ -128,6 +128,14 @@ const TABS: { key: AdminTab; label: string }[] = [
   { key: 'urls',    label: 'URL 분석' },
 ]
 
+// 응답 data를 배열로 정규화 — 배열이면 그대로, Spring 페이징 등 { content: [...] } 래핑도 호환.
+// (백엔드가 목록을 배열이 아닌 형태로 줘도 빈 목록 대신 실제 데이터를 표시하도록)
+function toArray<T>(data: unknown): T[] {
+  if (Array.isArray(data)) return data as T[]
+  const content = (data as { content?: unknown } | null)?.content
+  return Array.isArray(content) ? (content as T[]) : []
+}
+
 // ISO 문자열 → "2026-05-22 12:00"
 function formatDateTime(iso: string): string {
   try {
@@ -157,22 +165,24 @@ function AdminDashboard({ adminId, onLogout }: { adminId: string; onLogout: () =
     const load = async () => {
       setLoading(true)
       setError(false)
-      try {
-        const [reportRes, userRes, urlRes] = await Promise.all([
-          getAdminReports(),
-          getAdminUsers(),
-          getAdminUrls(),
-        ])
-        if (cancelled) return
-        // 응답 data가 배열일 때만 반영 — 예상과 다른 형태가 와도 목록 렌더가 크래시하지 않도록 방어
-        if (reportRes.success && Array.isArray(reportRes.data)) setReports(reportRes.data)
-        if (userRes.success && Array.isArray(userRes.data)) setUsers(userRes.data)
-        if (urlRes.success && Array.isArray(urlRes.data)) setUrls(urlRes.data)
-      } catch {
-        if (!cancelled) setError(true)
-      } finally {
-        if (!cancelled) setLoading(false)
+      // 세 목록을 독립적으로 조회 — 하나가 실패(미구현·에러)해도 나머지는 표시 (allSettled)
+      const [reportR, userR, urlR] = await Promise.allSettled([
+        getAdminReports(),
+        getAdminUsers(),
+        getAdminUrls(),
+      ])
+      if (cancelled) return
+
+      // 응답 data를 배열로 정규화 — 배열이면 그대로, Spring 페이징 등 { content: [...] } 형태도 호환
+      if (reportR.status === 'fulfilled' && reportR.value.success) setReports(toArray<AdminReportItem>(reportR.value.data))
+      if (userR.status === 'fulfilled' && userR.value.success) setUsers(toArray<AdminUserItem>(userR.value.data))
+      if (urlR.status === 'fulfilled' && urlR.value.success) setUrls(toArray<AdminUrlItem>(urlR.value.data))
+
+      // 세 조회가 모두 실패(rejected)한 경우에만 전체 에러로 처리
+      if (reportR.status === 'rejected' && userR.status === 'rejected' && urlR.status === 'rejected') {
+        setError(true)
       }
+      setLoading(false)
     }
 
     load()
