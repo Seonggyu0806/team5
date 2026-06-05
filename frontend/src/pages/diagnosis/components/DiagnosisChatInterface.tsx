@@ -73,7 +73,8 @@ export default function DiagnosisChatInterface({
     setLoading(true)
 
     try {
-      const res = await sendChat(sessionId, text)
+      // 진단 직후 시작되는 세션이므로 type·riskLevel을 함께 전송 → 백엔드가 세션 메타데이터로 저장(B방식)
+      const res = await sendChat(sessionId, text, { type: diagnosisType, riskLevel })
       if (res.success && res.data) {
         setMessages((prev) => [
           ...prev,

@@ -47,6 +47,9 @@ export interface PhishingHistory {
 export interface ChatRequest {
   sessionId: string
   message: string
+  // 세션 최초 생성 시 진단 메타데이터 — 백엔드가 세션에 저장 (대화 이력 목록의 type·riskLevel 용)
+  type?: 'url' | 'phone' | 'image' | 'voice'
+  riskLevel?: RiskLevel
 }
 
 export interface ChatResponse {
