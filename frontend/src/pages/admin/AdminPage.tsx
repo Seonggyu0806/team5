@@ -164,9 +164,10 @@ function AdminDashboard({ adminId, onLogout }: { adminId: string; onLogout: () =
           getAdminUrls(),
         ])
         if (cancelled) return
-        if (reportRes.success && reportRes.data) setReports(reportRes.data)
-        if (userRes.success && userRes.data) setUsers(userRes.data)
-        if (urlRes.success && urlRes.data) setUrls(urlRes.data)
+        // 응답 data가 배열일 때만 반영 — 예상과 다른 형태가 와도 목록 렌더가 크래시하지 않도록 방어
+        if (reportRes.success && Array.isArray(reportRes.data)) setReports(reportRes.data)
+        if (userRes.success && Array.isArray(userRes.data)) setUsers(userRes.data)
+        if (urlRes.success && Array.isArray(urlRes.data)) setUrls(urlRes.data)
       } catch {
         if (!cancelled) setError(true)
       } finally {
@@ -314,11 +315,12 @@ function UserList({ items }: { items: AdminUserItem[] }) {
         <div key={u.id} className="bg-slate-800 rounded-2xl border border-slate-700 p-4">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-blue-900/30 flex items-center justify-center shrink-0 text-blue-300 text-sm font-bold">
-              {u.nickname.charAt(0).toUpperCase()}
+              {/* nickname이 null/빈 값이어도 렌더 크래시 없이 안전하게 표시 */}
+              {(u.nickname?.trim()?.charAt(0) || '?').toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-white truncate">{u.nickname}</p>
-              <p className="text-xs text-slate-400 truncate">{u.email}</p>
+              <p className="text-sm font-semibold text-white truncate">{u.nickname || '(이름 없음)'}</p>
+              <p className="text-xs text-slate-400 truncate">{u.email || ''}</p>
             </div>
             <span className="text-xs text-slate-600 shrink-0">#{u.id}</span>
           </div>
