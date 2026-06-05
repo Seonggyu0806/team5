@@ -20,7 +20,14 @@ export const lookupNumber = async (phoneNumber: string): Promise<ApiResponse<Num
   if (USE_MOCK) return mockLookupNumber(phoneNumber)
 
   const res = await apiClient.get<ApiResponse<NumberLookupResult>>(`/reports/phone/${phoneNumber}`)
-  return res.data
+  const body = res.data
+  // 백엔드 조회 응답에는 hasData 필드가 없을 수 있다. 신고 이력(reportCount>0)이 있으면
+  // '데이터 있는 번호'로 간주한다. (이미 신고/저장된 번호가 hasData 누락으로 "데이터 없음"
+  //  신고유도 플로우로 잘못 빠지던 버그 방지 — reportCount가 가장 신뢰 가능한 기준)
+  if (body.data && body.data.hasData !== true) {
+    body.data.hasData = (body.data.reportCount ?? 0) > 0
+  }
+  return body
 }
 
 // 전화번호 신고 접수 — 신고 후 누적 신고 횟수 반환. 사용자가 입력한 피싱 유형(phishingType)을 함께 전송 가능
