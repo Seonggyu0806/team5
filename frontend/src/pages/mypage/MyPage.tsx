@@ -139,8 +139,12 @@ export default function MyPage() {
   }, [])
 
   const handleLogout = async () => {
-    await logout()
-    navigate('/')
+    try {
+      await logout()
+    } finally {
+      // logout()이 서버 요청 실패로 throw해도 토큰은 이미 삭제됨 → 항상 홈으로 이동
+      navigate('/')
+    }
   }
 
   const avatarLetter = user?.nickname?.charAt(0).toUpperCase() ?? 'U'
