@@ -89,52 +89,62 @@ export default function MyPage() {
     const load = async () => {
       setLoading(true)
       setError(false)
-      try {
-        // 분석 이력(URL·이미지·음성) + 내 신고 이력(전화번호) + 대화 세션 목록을 함께 조회
-        const [analysisRes, reportRes, sessionRes] = await Promise.all([
-          getPhishingHistory(),
-          getMyReports(),
-          getChatSessionList(),
-        ])
-        const items: HistoryItem[] = []
+      // 분석 이력 + 내 신고 이력 + 대화 세션 목록을 각각 독립적으로 조회.
+      // Promise.allSettled를 써서 일부 API가 미구현(404)·에러(500)여도
+      // 나머지 정상 데이터는 그대로 표시되게 한다. (하나 실패 시 전체가 빈 화면이 되던 버그 방지)
+      const [analysisR, reportR, sessionR] = await Promise.allSettled([
+        getPhishingHistory(),
+        getMyReports(),
+        getChatSessionList(),
+      ])
+      if (cancelled) return
 
-        if (analysisRes.success && analysisRes.data) {
-          for (const a of analysisRes.data) {
-            items.push({
-              id: `analysis-${a.id}`,
-              // 통합 API는 type 제공, 구버전 응답은 URL만 → 'url'로 간주
-              type: a.type ? (a.type.toLowerCase() as AnalysisType) : 'url',
-              target: a.target ?? a.url ?? '',
-              riskLevel: a.riskLevel,
-              riskScore: a.riskScore,
-              analyzedAt: a.analyzedAt,
-            })
-          }
-        }
+      const items: HistoryItem[] = []
 
-        if (reportRes.success && reportRes.data) {
-          for (const r of reportRes.data) {
-            items.push({
-              id: `report-${r.phoneNumber}-${r.createdAt}`,
-              type: 'phone',
-              target: r.phoneNumber,
-              riskLevel: riskFromReportCount(r.reportCount),
-              analyzedAt: r.createdAt,
-            })
-          }
+      if (analysisR.status === 'fulfilled' && analysisR.value.success && analysisR.value.data) {
+        for (const a of analysisR.value.data) {
+          items.push({
+            id: `analysis-${a.id}`,
+            // 통합 API는 type 제공, 구버전 응답은 URL만 → 'url'로 간주
+            type: a.type ? (a.type.toLowerCase() as AnalysisType) : 'url',
+            target: a.target ?? a.url ?? '',
+            riskLevel: a.riskLevel,
+            riskScore: a.riskScore,
+            analyzedAt: a.analyzedAt,
+          })
         }
-
-        // 최신순 정렬
-        items.sort((x, y) => y.analyzedAt.localeCompare(x.analyzedAt))
-        if (!cancelled) {
-          setAnalyses(items)
-          if (sessionRes.success && sessionRes.data) setSessions(sessionRes.data)
-        }
-      } catch {
-        if (!cancelled) setError(true)
-      } finally {
-        if (!cancelled) setLoading(false)
       }
+
+      if (reportR.status === 'fulfilled' && reportR.value.success && reportR.value.data) {
+        for (const r of reportR.value.data) {
+          items.push({
+            id: `report-${r.phoneNumber}-${r.createdAt}`,
+            type: 'phone',
+            target: r.phoneNumber,
+            riskLevel: riskFromReportCount(r.reportCount),
+            analyzedAt: r.createdAt,
+          })
+        }
+      }
+
+      // 최신순 정렬
+      items.sort((x, y) => y.analyzedAt.localeCompare(x.analyzedAt))
+      setAnalyses(items)
+
+      if (sessionR.status === 'fulfilled' && sessionR.value.success && sessionR.value.data) {
+        setSessions(sessionR.value.data)
+      }
+
+      // 세 조회가 모두 실패(rejected)한 경우에만 전체 에러로 처리
+      if (
+        analysisR.status === 'rejected' &&
+        reportR.status === 'rejected' &&
+        sessionR.status === 'rejected'
+      ) {
+        setError(true)
+      }
+
+      setLoading(false)
     }
 
     load()
