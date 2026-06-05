@@ -40,9 +40,9 @@ export const mockGetAdminUsers = async (): Promise<ApiResponse<AdminUserItem[]>>
     success: true,
     message: '성공했습니다.',
     data: [
-      { id: 1, email: 'test@test.com',    nickname: '테스터',  createdAt: '2026-05-22T12:00:00' },
-      { id: 2, email: 'hong@example.com', nickname: '홍길동',  createdAt: '2026-05-21T09:30:00' },
-      { id: 3, email: 'kim@example.com',  nickname: '김철수',  createdAt: '2026-05-20T16:45:00' },
+      { id: 1, email: 'test@test.com',    name: '테스터',  createdAt: '2026-05-22T12:00:00' },
+      { id: 2, email: 'hong@example.com', name: '홍길동',  createdAt: '2026-05-21T09:30:00' },
+      { id: 3, email: 'kim@example.com',  name: '김철수',  createdAt: '2026-05-20T16:45:00' },
     ],
   }
 }

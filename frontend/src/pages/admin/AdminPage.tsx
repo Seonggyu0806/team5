@@ -326,10 +326,10 @@ function UserList({ items }: { items: AdminUserItem[] }) {
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-blue-900/30 flex items-center justify-center shrink-0 text-blue-300 text-sm font-bold">
               {/* nickname이 null/빈 값이어도 렌더 크래시 없이 안전하게 표시 */}
-              {(u.nickname?.trim()?.charAt(0) || '?').toUpperCase()}
+              {(u.name?.trim()?.charAt(0) || '?').toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-white truncate">{u.nickname || '(이름 없음)'}</p>
+              <p className="text-sm font-semibold text-white truncate">{u.name || '(이름 없음)'}</p>
               <p className="text-xs text-slate-400 truncate">{u.email || ''}</p>
             </div>
             <span className="text-xs text-slate-600 shrink-0">#{u.id}</span>
