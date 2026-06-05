@@ -1,5 +1,12 @@
 import axios, { type AxiosError } from 'axios'
 
+// 일부 요청(예: 홈의 공개 위젯)은 401이 나도 로그인 페이지로 강제 이동시키지 않도록 표시
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    skipAuthRedirect?: boolean
+  }
+}
+
 // 개발: Vite proxy 사용 → /api/v1 → http://localhost:8080/api/v1 (CORS 없음)
 // 프로덕션: VITE_API_BASE_URL 직접 사용 (백엔드 CORS 설정 필요)
 const BASE_URL =
@@ -42,6 +49,9 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
     if (error.response?.status === 401) {
+      // 공개 위젯 등 인증 리다이렉트를 건너뛰도록 표시된 요청은 조용히 실패시킴
+      if (error.config?.skipAuthRedirect) return Promise.reject(error)
+
       const url = error.config?.url ?? ''
 
       if (url.startsWith('/admin')) {
