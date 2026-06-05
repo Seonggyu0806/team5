@@ -87,15 +87,62 @@
 
 ---
 
-## 요청 4 (선택) — 내 대화 세션 목록 API
+## 요청 4 — 대화 이력 계정 기반화 (마이페이지 "대화 이력")
 
-마이페이지 "대화 이력"도 동일하게 기기 종속 문제가 있습니다. 현재 `GET /api/v1/chat/{sessionId}/history`는 특정 세션만 조회 가능하고, **"내 전체 대화 세션 목록"을 주는 API가 없어** 세션 목록을 계정 기반으로 만들 수 없습니다.
+마이페이지 "대화 이력"도 분석 이력과 동일하게 **localStorage 기반이라 기기 종속** 문제가 있습니다.
+프론트는 이미 아래 API를 호출하도록 수정해 두었습니다 (개발 모드에서는 localStorage로 동작, 실서비스에서는 아래 API 호출). 백엔드에서 다음 3가지를 구현해 주세요.
 
-가능하면 아래 API 신설을 검토해 주세요. (분석 이력 작업보다 우선순위는 낮음)
+### (A) 내 대화 세션 목록 API 신설
 
 ```
 GET /api/v1/chat/sessions   (로그인 필요)
-→ data: [ { sessionId, 분석종류, riskLevel, createdAt, 마지막 메시지 미리보기 } ]
+```
+
+로그인한 사용자가 진행한 대화 세션 목록을 반환합니다.
+
+**응답 (`data[]`)**
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|:----:|------|
+| sessionId | String | O | 세션 ID |
+| type | String | O | 진단 종류 — `url` / `phone` / `image` / `voice` |
+| riskLevel | String | O | 위험 등급 (SAFE/LOW/MEDIUM/HIGH/CRITICAL) |
+| preview | String | O | 미리보기 텍스트 (첫 메시지 또는 진단 요약) |
+| createdAt | String | O | 세션 생성 시각 |
+
+```json
+{
+  "success": true,
+  "message": "성공했습니다",
+  "data": [
+    { "sessionId": "url-1718...", "type": "url", "riskLevel": "HIGH", "preview": "🔍 URL 분석이 완료되었습니다.", "createdAt": "2026-05-22 14:00:00" }
+  ]
+}
+```
+
+### (B) 세션 생성 시 메타데이터(type·riskLevel) 저장
+
+위 (A)가 `type`·`riskLevel`·`preview`를 돌려주려면, 백엔드가 세션을 만들 때 이 메타데이터를 함께
+저장해야 합니다. 현재 `POST /api/v1/chat` 요청은 `{ sessionId, message }`만 보내므로, 다음 중 하나가 필요합니다.
+- (권장) 진단 API(`/analysis/*`, `/reports/phone/{n}`)가 세션을 만들고 그 진단의 type·riskLevel을 세션에 기록
+- 또는 `POST /chat` 첫 호출 시 type·riskLevel을 함께 받도록 파라미터 확장 (프론트가 전송 가능)
+
+→ 어느 방식이 백엔드 구조에 맞는지 알려주시면 프론트를 맞추겠습니다.
+
+### (C) 대화 이력 조회 응답에 `riskLevel` 추가
+
+채팅 화면 상단의 위험도 뱃지 표시용입니다. 기존 `GET /api/v1/chat/{sessionId}/history` 응답에
+세션의 `riskLevel`을 추가해 주세요.
+
+```json
+{
+  "success": true,
+  "data": {
+    "sessionId": "abc123",
+    "riskLevel": "HIGH",        // ← 추가
+    "messages": [ ... ]
+  }
+}
 ```
 
 ---
@@ -142,5 +189,7 @@ GET /api/v1/chat/sessions   (로그인 필요)
 ## 우선순위
 
 1. **요청 1·2·3 (분석 이력 통합 — URL/이미지/음성/전화번호 조회)** — 마이페이지 분석 이력 버그 직결, 우선 처리 요망
-2. **요청 5 (챗봇 chatMessageId)** — 피드백 평가 기능 정상화에 필요. 응답 필드 1개 추가라 부담 적음
-3. 요청 4 (대화 세션 목록) — 여유 시 진행
+2. **요청 4 (대화 이력 계정 기반화)** — 마이페이지 대화 이력 기기 종속 문제. 프론트는 적용 완료, 백엔드 (A)(B)(C) 필요
+3. **요청 5 (챗봇 chatMessageId)** — 피드백 평가 기능 정상화. 응답 필드 1개 추가라 부담 적음
+
+> 참고: 프론트엔드는 요청 4·5에 대해 **"백엔드가 주면 자동 동작, 없으면 안전하게 비활성"** 으로 구현해 두었습니다. 즉 백엔드 미구현 상태에서도 앱은 깨지지 않으며, API가 준비되는 즉시 계정 기반으로 전환됩니다.

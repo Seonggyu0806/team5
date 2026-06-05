@@ -73,7 +73,18 @@ export interface ChatMessage {
 
 export interface ConversationHistory {
   sessionId: string
+  riskLevel?: RiskLevel // 세션 진단 위험도 — 채팅 화면 상단 뱃지에 표시. 백엔드가 제공하면 사용
   messages: ChatMessage[]
+}
+
+// ─── 대화 세션 목록 (GET /chat/sessions) ─────────────────────
+// 마이페이지 "대화 이력" 탭에 표시할 세션 요약. (메시지 본문은 미포함 — preview만)
+export interface ChatSessionSummary {
+  sessionId: string
+  type: 'url' | 'phone' | 'image' | 'voice' // 진단 종류
+  riskLevel: RiskLevel
+  preview: string  // 미리보기 텍스트
+  createdAt: string
 }
 
 // ─── 전화번호 ─────────────────────────────────────────────────

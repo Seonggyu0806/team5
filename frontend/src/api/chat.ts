@@ -1,11 +1,16 @@
 // AI 챗봇 상담 API
 // sendChat               : 사용자 메시지를 전송하고 AI 응답·위험도를 받음 (POST /api/v1/chat)
+// getChatSessionList     : 내 대화 세션 목록을 불러옴 (GET /api/v1/chat/sessions)
 // getConversationHistory : 세션 ID로 기존 대화 이력을 불러옴 (GET /api/v1/chat/{sessionId}/history)
 // sendFeedback           : AI 답변에 대한 도움 여부 평가 (POST /api/v1/chat/feedback)
 
-import type { ApiResponse, ChatResponse, ConversationHistory, ChatFeedbackRequest } from '@/types/api'
+import type {
+  ApiResponse, ChatResponse, ConversationHistory, ChatFeedbackRequest, ChatSessionSummary,
+} from '@/types/api'
 import apiClient from './client'
-import { mockSendChat, mockGetConversationHistory, mockSendFeedback } from './mock/chat'
+import {
+  mockSendChat, mockGetChatSessionList, mockGetConversationHistory, mockSendFeedback,
+} from './mock/chat'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
@@ -14,6 +19,14 @@ export const sendChat = async (sessionId: string, message: string): Promise<ApiR
   if (USE_MOCK) return mockSendChat(message, sessionId)
 
   const res = await apiClient.post<ApiResponse<ChatResponse>>('/chat', { sessionId, message })
+  return res.data
+}
+
+// 내 대화 세션 목록 조회 — 마이페이지 "대화 이력" 탭에서 사용 (로그인 필요)
+export const getChatSessionList = async (): Promise<ApiResponse<ChatSessionSummary[]>> => {
+  if (USE_MOCK) return mockGetChatSessionList()
+
+  const res = await apiClient.get<ApiResponse<ChatSessionSummary[]>>('/chat/sessions')
   return res.data
 }
 
