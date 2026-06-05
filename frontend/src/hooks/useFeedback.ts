@@ -6,19 +6,20 @@ import { sendFeedback } from '@/api/chat'
 type FeedbackStatus = 'helpful' | 'not_helpful' | 'loading'
 
 export function useFeedback() {
+  // key: chatMessageId (AI 답변의 서버 고유 ID)
   const [feedbackMap, setFeedbackMap] = useState<Record<number, FeedbackStatus>>({})
 
-  const handleFeedback = async (messageIndex: number, isHelpful: boolean) => {
-    if (feedbackMap[messageIndex]) return
+  const handleFeedback = async (chatMessageId: number, isHelpful: boolean) => {
+    if (feedbackMap[chatMessageId]) return
 
-    setFeedbackMap((prev) => ({ ...prev, [messageIndex]: 'loading' }))
+    setFeedbackMap((prev) => ({ ...prev, [chatMessageId]: 'loading' }))
     try {
-      await sendFeedback({ chatMessageId: messageIndex, isHelpful })
-      setFeedbackMap((prev) => ({ ...prev, [messageIndex]: isHelpful ? 'helpful' : 'not_helpful' }))
+      await sendFeedback({ chatMessageId, isHelpful })
+      setFeedbackMap((prev) => ({ ...prev, [chatMessageId]: isHelpful ? 'helpful' : 'not_helpful' }))
     } catch {
       setFeedbackMap((prev) => {
         const next = { ...prev }
-        delete next[messageIndex]
+        delete next[chatMessageId]
         return next
       })
     }

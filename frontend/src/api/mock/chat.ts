@@ -25,6 +25,9 @@ const defaultReplies = [
   `네, 이해했습니다. 현재 상황에서 가장 안전한 방법은 해당 연락을 무시하고 차단하는 것입니다. 이미 개인정보를 제공하셨다면 즉시 금융감독원(1332)에 연락해 추가 피해를 방지하세요.`,
 ]
 
+// AI 답변마다 부여하는 고유 ID (실제 백엔드의 chatMessageId를 모사)
+let mockChatMessageIdSeq = 1
+
 export const mockSendChat = async (message: string, sessionId: string): Promise<ApiResponse<ChatResponse>> => {
   await new Promise((r) => setTimeout(r, 1000 + Math.random() * 500))
 
@@ -37,7 +40,7 @@ export const mockSendChat = async (message: string, sessionId: string): Promise<
   return {
     success: true,
     message: '성공했습니다',
-    data: { sessionId, reply, riskLevel: 'HIGH' },
+    data: { sessionId, reply, riskLevel: 'HIGH', chatMessageId: mockChatMessageIdSeq++ },
   }
 }
 
