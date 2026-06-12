@@ -1,15 +1,14 @@
 // 전화번호 조회·신고 API
 // lookupNumber        : 전화번호를 조회해 신고 횟수·위험 등급을 반환 (GET /api/v1/reports/phone/{phoneNumber})
 // reportNumber        : 사용자가 직접 위험 번호를 신고 (POST /api/v1/reports/phone)
-// getNumberRanking    : 최근 7일 신고 누적 순위 조회 (GET /api/v1/reports/ranking)
 // getMyReports        : 내가 신고한 이력 조회 (GET /api/v1/reports/my)
+// (7일 신고 순위 GET /reports/ranking는 홈 TOP5에서만 쓰므로 dashboard.ts의 getTopReportedNumbers로 일원화)
 
-import type { ApiResponse, NumberLookupResult, NumberReportResult, NumberRankingItem, MyReportItem } from '@/types/api'
+import type { ApiResponse, NumberLookupResult, NumberReportResult, MyReportItem } from '@/types/api'
 import apiClient from './client'
 import {
   mockLookupNumber,
   mockReportNumber,
-  mockGetNumberRanking,
   mockGetMyReports,
 } from './mock/number'
 
@@ -40,14 +39,6 @@ export const reportNumber = async (
 
   const body = phishingType ? { number, phishingType } : { number }
   const res = await apiClient.post<ApiResponse<NumberReportResult>>('/reports/phone', body)
-  return res.data
-}
-
-// 최근 7일 신고 누적 순위 조회 — 로그인 필요
-export const getNumberRanking = async (): Promise<ApiResponse<NumberRankingItem[]>> => {
-  if (USE_MOCK) return mockGetNumberRanking()
-
-  const res = await apiClient.get<ApiResponse<NumberRankingItem[]>>('/reports/ranking')
   return res.data
 }
 

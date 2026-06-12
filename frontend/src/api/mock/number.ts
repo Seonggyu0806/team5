@@ -1,4 +1,4 @@
-import type { ApiResponse, NumberLookupResult, NumberReportResult, NumberRankingItem, MyReportItem } from '@/types/api'
+import type { ApiResponse, NumberLookupResult, NumberReportResult, MyReportItem } from '@/types/api'
 import { mockTopStore } from './store'
 
 // 목 환경에서 "현재 로그인 계정"을 식별 — AuthContext가 localStorage에 저장한 사용자 정보 사용
@@ -69,20 +69,6 @@ export const mockReportNumber = async (
       alreadyReported,
       message: alreadyReported ? '이미 신고한 번호입니다' : '신고가 접수되었습니다',
     },
-  }
-}
-
-export const mockGetNumberRanking = async (): Promise<ApiResponse<NumberRankingItem[]>> => {
-  await new Promise((r) => setTimeout(r, 500))
-
-  return {
-    success: true,
-    message: '성공했습니다',
-    data: mockTopStore.getTop5().map((n) => ({
-      rank: n.rank,
-      phoneNumber: n.number,
-      reportCount: n.reportCount,
-    })),
   }
 }
 
