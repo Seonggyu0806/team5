@@ -48,19 +48,22 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
-    if (error.response?.status === 401) {
+    // 🚨 핵심 수정 부분: 401 뿐만 아니라 403(Forbidden) 에러도 동일하게 처리
+    if (error.response?.status === 401 || error.response?.status === 403) {
       // 공개 위젯 등 인증 리다이렉트를 건너뛰도록 표시된 요청은 조용히 실패시킴
       if (error.config?.skipAuthRedirect) return Promise.reject(error)
 
       const url = error.config?.url ?? ''
 
       if (url.startsWith('/admin')) {
-        // 관리자 토큰 만료 → 관리자 로그인 화면으로
+        // 관리자 토큰 만료/권한 없음 → 관리자 로그인 화면으로 유도
+        alert('관리자 세션이 만료되었거나 권한이 없습니다. 다시 로그인해 주세요.');
         localStorage.removeItem('donkimi_admin_token')
         localStorage.removeItem('donkimi_admin_id')
         if (window.location.pathname === '/admin') window.location.reload()
       } else {
-        // 사용자 토큰 만료 → 로그인 페이지로
+        // 사용자 토큰 만료/권한 없음 → 로그인 페이지로 유도
+        alert('세션이 만료되었습니다. 다시 로그인해 주세요.');
         localStorage.removeItem('donkimi_user')
         window.location.href = '/login'
       }
