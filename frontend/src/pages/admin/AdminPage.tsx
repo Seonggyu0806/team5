@@ -157,6 +157,7 @@ function AdminDashboard({ adminId, onLogout }: { adminId: string; onLogout: () =
   const [urls, setUrls] = useState<AdminUrlItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0) // 수동 "다시 시도" 트리거
 
   // 신고·유저·URL 목록을 한 번에 조회
   useEffect(() => {
@@ -165,29 +166,47 @@ function AdminDashboard({ adminId, onLogout }: { adminId: string; onLogout: () =
     const load = async () => {
       setLoading(true)
       setError(false)
-      // 세 목록을 독립적으로 조회 — 하나가 실패(미구현·에러)해도 나머지는 표시 (allSettled)
-      const [reportR, userR, urlR] = await Promise.allSettled([
-        getAdminReports(),
-        getAdminUsers(),
-        getAdminUrls(),
-      ])
-      if (cancelled) return
 
-      // 응답 data를 배열로 정규화 — 배열이면 그대로, Spring 페이징 등 { content: [...] } 형태도 호환
-      if (reportR.status === 'fulfilled' && reportR.value.success) setReports(toArray<AdminReportItem>(reportR.value.data))
-      if (userR.status === 'fulfilled' && userR.value.success) setUsers(toArray<AdminUserItem>(userR.value.data))
-      if (urlR.status === 'fulfilled' && urlR.value.success) setUrls(toArray<AdminUrlItem>(urlR.value.data))
+      // 세 목록이 모두 실패하면 백엔드 콜드 스타트 등 일시적 장애일 수 있으므로
+      // 점점 늘어나는 간격(2s→4s)으로 최대 3회까지 자동 재시도한다.
+      // (하나라도 성공하면 즉시 표시 — allSettled로 부분 실패는 그대로 반영)
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const [reportR, userR, urlR] = await Promise.allSettled([
+          getAdminReports(),
+          getAdminUsers(),
+          getAdminUrls(),
+        ])
+        if (cancelled) return
 
-      // 세 조회가 모두 실패(rejected)한 경우에만 전체 에러로 처리
-      if (reportR.status === 'rejected' && userR.status === 'rejected' && urlR.status === 'rejected') {
-        setError(true)
+        const allFailed =
+          reportR.status === 'rejected' &&
+          userR.status === 'rejected' &&
+          urlR.status === 'rejected'
+
+        if (!allFailed) {
+          // 응답 data를 배열로 정규화 — 배열이면 그대로, Spring 페이징 등 { content:[...] }도 호환
+          if (reportR.status === 'fulfilled' && reportR.value.success) setReports(toArray<AdminReportItem>(reportR.value.data))
+          if (userR.status === 'fulfilled' && userR.value.success) setUsers(toArray<AdminUserItem>(userR.value.data))
+          if (urlR.status === 'fulfilled' && urlR.value.success) setUrls(toArray<AdminUrlItem>(urlR.value.data))
+          setLoading(false)
+          return
+        }
+
+        // 전체 실패 — 마지막 시도가 아니면 잠시 대기 후 재시도 (서버 워밍업 대기)
+        if (attempt < 2) {
+          await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)))
+          if (cancelled) return
+        }
       }
+
+      // 자동 재시도까지 모두 실패
+      setError(true)
       setLoading(false)
     }
 
     load()
     return () => { cancelled = true }
-  }, [])
+  }, [reloadKey])
 
   const handleLogout = async () => {
     setLoggingOut(true)
@@ -268,7 +287,13 @@ function AdminDashboard({ adminId, onLogout }: { adminId: string; onLogout: () =
           ) : error ? (
             <div className="py-14 text-center">
               <p className="text-sm font-semibold text-slate-400">목록을 불러오지 못했습니다</p>
-              <p className="text-xs text-slate-500 mt-1">잠시 후 다시 시도해 주세요</p>
+              <p className="text-xs text-slate-500 mt-1">서버가 응답하지 않습니다. 잠시 후 다시 시도해 주세요</p>
+              <button
+                onClick={() => setReloadKey((k) => k + 1)}
+                className="mt-4 px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-500 active:scale-95 transition-all"
+              >
+                다시 시도
+              </button>
             </div>
           ) : tab === 'reports' ? (
             <ReportList items={reports} />
