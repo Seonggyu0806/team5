@@ -4,7 +4,6 @@ import { analyzeImage } from '@/api/media'
 import type { ImageAnalyzeResult } from '@/types/api'
 import DiagnosisChatInterface from '../components/DiagnosisChatInterface'
 import AnalyzingCard from '../components/AnalyzingCard'
-import { saveAnalysis } from '@/lib/analysisHistory'
 import { riskLabel, riskPercent, generateSessionId } from '@/lib/utils'
 
 function buildInitialMessage(result: ImageAnalyzeResult): string {
@@ -59,7 +58,6 @@ export default function ImageTab() {
       const res = await analyzeImage(file)
       if (res.success && res.data) {
         setResult({ data: res.data, sessionId: generateSessionId('image') })
-        saveAnalysis({ type: 'image', target: file.name, riskLevel: res.data.riskLevel })
       } else {
         setError(res.message || '분석에 실패했습니다.')
       }

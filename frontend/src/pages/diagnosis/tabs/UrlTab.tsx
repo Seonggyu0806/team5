@@ -4,7 +4,6 @@ import { analyzeUrl } from '@/api/phishing'
 import type { PhishingAnalyzeResult } from '@/types/api'
 import DiagnosisChatInterface from '../components/DiagnosisChatInterface'
 import AnalyzingCard from '../components/AnalyzingCard'
-import { saveAnalysis } from '@/lib/analysisHistory'
 import { riskLabel, riskPercent, generateSessionId } from '@/lib/utils'
 
 function buildInitialMessage(url: string, result: PhishingAnalyzeResult): string {
@@ -49,12 +48,6 @@ export default function UrlTab() {
       const res = await analyzeUrl(url.trim())
       if (res.success && res.data) {
         setResult({ data: res.data, sessionId: generateSessionId('url') })
-        saveAnalysis({
-          type: 'url',
-          target: url.trim(),
-          riskLevel: res.data.riskLevel,
-          riskScore: res.data.riskScore,
-        })
       } else {
         setError(res.message || '분석에 실패했습니다.')
       }

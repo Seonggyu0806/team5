@@ -5,7 +5,6 @@ import type { NumberLookupResult } from '@/types/api'
 import DiagnosisChatInterface from '../components/DiagnosisChatInterface'
 import PhoneReportFlow from '../components/PhoneReportFlow'
 import AnalyzingCard from '../components/AnalyzingCard'
-import { saveAnalysis } from '@/lib/analysisHistory'
 import { riskLabel, riskPercent, generateSessionId, getRiskLevelByReportCount } from '@/lib/utils'
 
 function buildInitialMessage(result: NumberLookupResult, alreadyReported: boolean): string {
@@ -82,7 +81,6 @@ export default function PhoneTab() {
             // 자동 신고 실패 시에도 조회 결과는 그대로 표시
           }
           setView({ kind: 'result', data, sessionId, alreadyReported })
-          saveAnalysis({ type: 'phone', target: phone.trim(), riskLevel: data.riskLevel })
         } else {
           // 데이터 없음 — 신고 유도 플로우 표시 (이력은 신고 완료 후 저장)
           setView({ kind: 'no-data', phone: phone.trim(), sessionId })
@@ -121,7 +119,6 @@ export default function PhoneTab() {
         sessionId={view.sessionId}
         phoneNumber={view.phone}
         onReset={reset}
-        onReported={() => saveAnalysis({ type: 'phone', target: view.phone, riskLevel: 'LOW' })}
       />
     )
   }
