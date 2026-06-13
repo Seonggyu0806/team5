@@ -31,6 +31,14 @@ function AdminLoginForm({ onSuccess }: { onSuccess: (user: AdminUser) => void })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  // 403/401 인터셉터가 세션 만료를 감지하면 sessionStorage에 플래그를 남기고 페이지를 리로드함.
+  // 로그인 폼이 마운트될 때 이 플래그를 읽어 경고 배너를 표시하고 즉시 플래그를 지운다.
+  const [sessionExpired] = useState(() => {
+    const expired = sessionStorage.getItem('admin_session_expired') === '1'
+    if (expired) sessionStorage.removeItem('admin_session_expired')
+    return expired
+  })
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!adminId.trim() || !password.trim()) return
@@ -66,6 +74,16 @@ function AdminLoginForm({ onSuccess }: { onSuccess: (user: AdminUser) => void })
 
         <div className="bg-slate-800 rounded-2xl border border-slate-700 p-6">
           <h2 className="text-lg font-bold text-white mb-5">관리자 로그인</h2>
+
+          {sessionExpired && (
+            <div className="flex items-start gap-2.5 bg-yellow-900/30 border border-yellow-700/50 rounded-xl px-4 py-3 mb-4">
+              <ShieldAlert className="w-4 h-4 text-yellow-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-yellow-300">세션이 만료됐습니다</p>
+                <p className="text-xs text-yellow-400/80 mt-0.5">보안을 위해 자동 로그아웃됐습니다. 다시 로그인해 주세요.</p>
+              </div>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>

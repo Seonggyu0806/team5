@@ -48,22 +48,32 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
-    if (error.response?.status === 401) {
+    const status = error.response?.status
+    const url = error.config?.url ?? ''
+
+    if (status === 401) {
       // 공개 위젯 등 인증 리다이렉트를 건너뛰도록 표시된 요청은 조용히 실패시킴
       if (error.config?.skipAuthRedirect) return Promise.reject(error)
 
-      const url = error.config?.url ?? ''
-
       if (url.startsWith('/admin')) {
-        // 관리자 토큰 만료 → 관리자 로그인 화면으로
+        // 관리자 토큰 만료(401) → 세션 만료 플래그 + 관리자 로그인 화면으로
         localStorage.removeItem('donkimi_admin_token')
         localStorage.removeItem('donkimi_admin_id')
+        sessionStorage.setItem('admin_session_expired', '1')
         if (window.location.pathname === '/admin') window.location.reload()
       } else {
         // 사용자 토큰 만료 → 로그인 페이지로
         localStorage.removeItem('donkimi_user')
         window.location.href = '/login'
       }
+    }
+
+    if (status === 403 && url.startsWith('/admin')) {
+      // 관리자 403 = 토큰 만료(JWT 파기) 또는 권한 없음 → 동일하게 재로그인 유도
+      localStorage.removeItem('donkimi_admin_token')
+      localStorage.removeItem('donkimi_admin_id')
+      sessionStorage.setItem('admin_session_expired', '1')
+      if (window.location.pathname === '/admin') window.location.reload()
     }
 
     return Promise.reject(error)
