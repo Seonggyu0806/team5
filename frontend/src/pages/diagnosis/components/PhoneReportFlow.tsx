@@ -9,13 +9,12 @@ interface PhoneReportFlowProps {
   sessionId: string
   phoneNumber: string
   onReset: () => void
-  onReported?: () => void // 신고 완료 후 부모에서 추가 처리(예: 분석 이력 저장)
 }
 
 type Step = 'ask-type' | 'submitting' | 'done'
 
 // "데이터 없음 → 유형 입력 → 신고 → 감사 인사" 시나리오를 진행하는 챗 UI
-export default function PhoneReportFlow({ sessionId, phoneNumber, onReset, onReported }: PhoneReportFlowProps) {
+export default function PhoneReportFlow({ sessionId, phoneNumber, onReset }: PhoneReportFlowProps) {
   const noDataMessage = [
     `📞 전화번호 분석이 완료되었습니다.`,
     ``,
@@ -83,7 +82,6 @@ export default function PhoneReportFlow({ sessionId, phoneNumber, onReset, onRep
         },
       ])
       setStep('done')
-      onReported?.()
     } catch {
       setMessages((prev) => [
         ...prev,
