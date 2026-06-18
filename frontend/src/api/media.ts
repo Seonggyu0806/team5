@@ -7,7 +7,8 @@ import apiClient from './client'
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
 // 음성 파일 분석 — convertedText(음성→텍스트), riskLevel 반환
-export const analyzeVoice = async (file: File): Promise<ApiResponse<VoiceAnalyzeResult>> => {
+// files: 통화가 여러 녹음으로 쪼개진 경우 여러 개를 한 맥락으로 전송
+export const analyzeVoice = async (files: File[]): Promise<ApiResponse<VoiceAnalyzeResult>> => {
   if (USE_MOCK) {
     await new Promise((r) => setTimeout(r, 1500))
     return {
@@ -23,7 +24,8 @@ export const analyzeVoice = async (file: File): Promise<ApiResponse<VoiceAnalyze
   }
 
   const formData = new FormData()
-  formData.append('file', file)
+  // 같은 key 'file'로 여러 번 append → 백엔드 List<MultipartFile>와 일치
+  files.forEach((file) => formData.append('file', file))
   const res = await apiClient.post<ApiResponse<VoiceAnalyzeResult>>('/analysis/voice', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
@@ -31,7 +33,8 @@ export const analyzeVoice = async (file: File): Promise<ApiResponse<VoiceAnalyze
 }
 
 // 이미지 파일 분석 — extractedText(OCR), detectedKeywords, riskLevel 반환
-export const analyzeImage = async (file: File): Promise<ApiResponse<ImageAnalyzeResult>> => {
+// files: 카톡 대화 등 여러 장 캡처를 한 맥락으로 전송
+export const analyzeImage = async (files: File[]): Promise<ApiResponse<ImageAnalyzeResult>> => {
   if (USE_MOCK) {
     await new Promise((r) => setTimeout(r, 1500))
     return {
@@ -48,7 +51,7 @@ export const analyzeImage = async (file: File): Promise<ApiResponse<ImageAnalyze
   }
 
   const formData = new FormData()
-  formData.append('file', file)
+  files.forEach((file) => formData.append('file', file))
   const res = await apiClient.post<ApiResponse<ImageAnalyzeResult>>('/analysis/image', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
