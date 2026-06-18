@@ -22,33 +22,43 @@ function buildInitialMessage(result: VoiceAnalyzeResult): string {
 }
 
 export default function VoiceTab() {
-  const [file, setFile] = useState<File | null>(null)
+  const [files, setFiles] = useState<File[]>([])
   const [result, setResult] = useState<{ data: VoiceAnalyzeResult; sessionId: string } | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [dragging, setDragging] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  const handleFile = (f: File) => {
-    if (!f.type.startsWith('audio/')) { setError('음성 파일(mp3, wav, m4a 등)만 업로드할 수 있습니다.'); return }
-    setFile(f)
+  // 여러 녹음 파일을 기존 목록에 누적 추가
+  const handleFile = (incoming: File[]) => {
+    const audios = incoming.filter((f) => f.type.startsWith('audio/'))
+    if (audios.length === 0) { setError('음성 파일(mp3, wav, m4a 등)만 업로드할 수 있습니다.'); return }
+    if (audios.length !== incoming.length) {
+      setError('음성 파일만 추가됩니다. 일부 파일은 제외되었습니다.')
+    } else {
+      setError('')
+    }
+    setFiles((prev) => [...prev, ...audios])
     setResult(null)
-    setError('')
   }
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setDragging(false)
-    const f = e.dataTransfer.files[0]
-    if (f) handleFile(f)
+    if (e.dataTransfer.files.length) handleFile(Array.from(e.dataTransfer.files))
+  }
+
+  // 목록에서 개별 음성 파일 제거
+  const removeFile = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
   const handleSubmit = async () => {
-    if (!file) return
+    if (files.length === 0) return
     setLoading(true)
     setError('')
     try {
-      const res = await analyzeVoice(file)
+      const res = await analyzeVoice(files)
       if (res.success && res.data) {
         setResult({ data: res.data, sessionId: generateSessionId('voice') })
       } else {
@@ -62,7 +72,7 @@ export default function VoiceTab() {
   }
 
   const reset = () => {
-    setFile(null); setResult(null); setError('')
+    setFiles([]); setResult(null); setError('')
     if (inputRef.current) inputRef.current.value = ''
   }
 
@@ -92,9 +102,9 @@ export default function VoiceTab() {
           </div>
           <h2 className="font-bold text-slate-800 text-sm">음성 분석</h2>
         </div>
-        <p className="text-xs text-slate-400 mb-4">의심 통화 녹음 파일을 업로드하면 AI가 분석해드려요</p>
+        <p className="text-xs text-slate-400 mb-4">의심 통화 녹음 파일을 여러 개 올리면 AI가 한 번에 분석해드려요</p>
 
-        {!file ? (
+        {files.length === 0 ? (
           <div
             onClick={() => inputRef.current?.click()}
             onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
@@ -110,24 +120,41 @@ export default function VoiceTab() {
               <Upload className="w-7 h-7 text-slate-400" />
             </div>
             <p className="text-sm font-semibold text-slate-600 mb-1">음성 파일을 탭하여 선택</p>
-            <p className="text-xs text-slate-400">또는 파일을 여기로 끌어다 놓으세요</p>
+            <p className="text-xs text-slate-400">또는 파일을 여기로 끌어다 놓으세요 (여러 개 선택 가능)</p>
             <p className="text-xs text-slate-300 mt-2">MP3 · WAV · M4A · AAC 지원</p>
-            <input ref={inputRef} type="file" accept="audio/*" className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
+            <input ref={inputRef} type="file" accept="audio/*" multiple className="hidden"
+              onChange={(e) => { if (e.target.files?.length) handleFile(Array.from(e.target.files)) }} />
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="flex items-center gap-3 p-4 bg-amber-50 rounded-2xl border border-amber-100">
-              <div className="w-11 h-11 bg-amber-100 rounded-2xl flex items-center justify-center shrink-0">
-                <FileAudio className="w-5 h-5 text-amber-500" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-slate-800 truncate">{file.name}</p>
-                <p className="text-xs text-slate-400 mt-0.5">{(file.size / 1024 / 1024).toFixed(1)} MB</p>
-              </div>
-              <button onClick={reset} className="text-slate-400 hover:text-slate-600 transition-colors p-1">
-                <X className="w-4 h-4" />
-              </button>
+            <div className="space-y-2">
+              {files.map((f, i) => (
+                <div key={`${f.name}-${i}`} className="flex items-center gap-3 p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                  <div className="w-11 h-11 bg-amber-100 rounded-2xl flex items-center justify-center shrink-0">
+                    <FileAudio className="w-5 h-5 text-amber-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 truncate">{f.name}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{(f.size / 1024 / 1024).toFixed(1)} MB</p>
+                  </div>
+                  <button onClick={() => removeFile(i)} aria-label="음성 파일 삭제" className="text-slate-400 hover:text-red-500 transition-colors p-1">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => inputRef.current?.click()}
+              className="w-full rounded-2xl border-2 border-dashed border-slate-200 py-3 flex items-center justify-center gap-2 text-slate-400 hover:border-amber-300 hover:bg-slate-50 transition-all"
+            >
+              <Upload className="w-4 h-4" />
+              <span className="text-xs font-semibold">음성 파일 추가</span>
+            </button>
+            <input ref={inputRef} type="file" accept="audio/*" multiple className="hidden"
+              onChange={(e) => { if (e.target.files?.length) handleFile(Array.from(e.target.files)) }} />
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-slate-400">{files.length}개 선택됨</p>
+              <button onClick={reset} className="text-xs text-slate-400 hover:text-red-500 transition-colors">전체 초기화</button>
             </div>
             <button
               onClick={handleSubmit}
