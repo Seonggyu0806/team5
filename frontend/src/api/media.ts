@@ -26,8 +26,11 @@ export const analyzeVoice = async (files: File[]): Promise<ApiResponse<VoiceAnal
   const formData = new FormData()
   // 같은 key 'file'로 여러 번 append → 백엔드 List<MultipartFile>와 일치
   files.forEach((file) => formData.append('file', file))
+  // 클로바 STT 60초 제한으로 백엔드가 파일을 60초 단위로 분할해 여러 번 변환 →
+  // 기본 30초 타임아웃으로는 부족하므로 음성 분석만 120초로 확장
   const res = await apiClient.post<ApiResponse<VoiceAnalyzeResult>>('/analysis/voice', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000,
   })
   return res.data
 }
@@ -52,8 +55,10 @@ export const analyzeImage = async (files: File[]): Promise<ApiResponse<ImageAnal
 
   const formData = new FormData()
   files.forEach((file) => formData.append('file', file))
+  // OCR + AI 분석은 여러 장이면 기본 30초를 넘길 수 있으므로 120초로 확장
   const res = await apiClient.post<ApiResponse<ImageAnalyzeResult>>('/analysis/image', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000,
   })
   return res.data
 }
