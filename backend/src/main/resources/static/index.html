@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>AI 보이스피싱 통합 탐지 시스템</title>
+    <style>
+        body { font-family: 'Pretendard', sans-serif; padding: 40px; line-height: 1.6; max-width: 800px; margin: 0 auto; background-color: #f8f9fa; }
+        .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { color: #2c3e50; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+        .section { margin-bottom: 30px; padding: 20px; border: 1px solid #eee; border-radius: 8px; }
+        input[type="text"] { width: 70%; padding: 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 16px; }
+        input[type="file"] { padding: 10px; font-size: 14px; }
+        button { padding: 12px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: 0.3s; margin-top: 10px; }
+        .btn-analyze { background-color: #007bff; color: white; }
+        .btn-analyze:hover { background-color: #0056b3; }
+        .btn-voice { background-color: #6f42c1; color: white; }
+        .btn-voice:hover { background-color: #59359a; }
+        .btn-image { background-color: #fd7e14; color: white; }
+        .btn-image:hover { background-color: #e86e04; }
+        .btn-good { background-color: #28a745; color: white; margin-right: 10px; }
+        .btn-bad { background-color: #dc3545; color: white; }
+        .result-box { background-color: #f1f3f5; padding: 15px; border-radius: 4px; margin-top: 20px; white-space: pre-wrap; min-height: 50px; border-left: 5px solid #ccc; }
+        .result-url { border-left-color: #007bff; }
+        .result-voice { border-left-color: #6f42c1; }
+        .result-image { border-left-color: #fd7e14; }
+        .stats-box { display: flex; justify-content: space-around; background: #e9ecef; padding: 20px; border-radius: 8px; text-align: center; }
+        .stat-item { flex: 1; }
+        .stat-value { display: block; font-size: 24px; font-weight: bold; color: #333; }
+        .stat-label { font-size: 14px; color: #666; }
+        .extracted-text-box { background: #fff3cd; padding: 15px; border-radius: 4px; margin-top: 15px; display: none; border-left: 5px solid #ffc107; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🛡️ AI 보이스피싱 통합 탐지 시스템</h1>
+
+    <div class="section">
+        <h2>🔍 URL 피싱 분석</h2>
+        <input type="text" id="urlInput" placeholder="예: http://kb-bank-security.com">
+        <button class="btn-analyze" onclick="analyzeUrl()">URL 분석 시작</button>
+        <div id="urlResultArea" class="result-box result-url">분석 결과가 여기에 표시됩니다.</div>
+    </div>
+
+    <div class="section">
+        <h2>🎙️ 통화 녹음 분석 (STT + AI)</h2>
+        <p>의심되는 통화 녹음 파일(.m4a, .mp3)을 올려주세요.</p>
+        <input type="file" id="audioInput" accept="audio/*">
+        <button class="btn-voice" onclick="analyzeVoice()">음성 듣고 분석하기</button>
+
+        <div id="sttText" class="extracted-text-box"></div>
+
+        <div id="voiceResultArea" class="result-box result-voice">음성 분석 결과가 여기에 표시됩니다.</div>
+    </div>
+
+    <div class="section">
+        <h2>📸 캡처 사진 분석 (OCR + AI)</h2>
+        <p>스미싱 문자나 의심되는 앱 화면 캡처본을 올려주세요.</p>
+        <input type="file" id="imageInput" accept="image/*">
+        <button class="btn-image" onclick="analyzeImage()">사진 분석 시작</button>
+
+        <div id="ocrText" class="extracted-text-box"></div>
+
+        <div id="imageResultArea" class="result-box result-image">사진 분석 결과가 여기에 표시됩니다.</div>
+    </div>
+
+    <div class="section" id="evaluationSection" style="display:none;">
+        <h2>📊 분석 결과는 어떠셨나요?</h2>
+        <p>방금 진행한 AI의 분석 결과가 정확했다면 평가를 남겨주세요.</p>
+        <button class="btn-good" onclick="sendFeedback(true)">👍 도움됨</button>
+        <button class="btn-bad" onclick="sendFeedback(false)">👎 도움안됨</button>
+    </div>
+
+    <div class="section">
+        <h2>📈 실시간 솔루션 만족도</h2>
+        <div class="stats-box">
+            <div class="stat-item">
+                <span class="stat-label">총 분석</span>
+                <span id="totalCount" class="stat-value">0</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">도움됨</span>
+                <span id="helpfulCount" class="stat-value">0</span>
+            </div>
+            <div class="stat-item" style="color: #dc3545;">
+                <span class="stat-label">정확도(%)</span>
+                <span id="satisfactionRate" class="stat-value">0</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let lastAnalysisId = 1;
+
+    // 1. URL 분석
+    function analyzeUrl() {
+        const url = document.getElementById('urlInput').value;
+        if(!url) { alert("URL을 입력해주세요."); return; }
+        document.getElementById('urlResultArea').innerText = "분석 중입니다...";
+
+        fetch('/api/v1/phishing/analyze', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `url=${encodeURIComponent(url)}`
+        })
+            .then(response => response.text())
+            .then(data => {
+                document.getElementById('urlResultArea').innerText = data;
+                document.getElementById('evaluationSection').style.display = 'block';
+                loadStats();
+            })
+            .catch(err => alert("분석 중 오류 발생: " + err));
+    }
+
+    // 2. 음성 파일 분석 (STT + AI)
+    function analyzeVoice() {
+        const fileInput = document.getElementById('audioInput');
+        if (fileInput.files.length === 0) { alert("파일을 선택해주세요!"); return; }
+
+        const formData = new FormData();
+        formData.append("file", fileInput.files[0]);
+
+        document.getElementById('voiceResultArea').innerText = "🎙️ 음성 변환 및 AI 분석 중... (잠시만 기다려주세요)";
+        document.getElementById('sttText').style.display = 'none';
+
+        fetch('/api/v1/voice', { method: 'POST', body: formData })
+            .then(response => response.json())
+            .then(data => {
+                if(data.error) {
+                    document.getElementById('voiceResultArea').innerText = data.error;
+                } else {
+                    document.getElementById('sttText').innerText = "📝 [추출된 대화 내용]\n" + data.extractedText;
+                    document.getElementById('sttText').style.display = 'block';
+                    document.getElementById('voiceResultArea').innerText = "🤖 [AI 수사관 분석 결과]\n\n" + data.aiResult;
+                    document.getElementById('evaluationSection').style.display = 'block';
+                    loadStats();
+                }
+            })
+            .catch(err => document.getElementById('voiceResultArea').innerText = "분석 실패: " + err);
+    }
+
+    // 3. 사진 파일 분석 (Google Vision + AI)
+    function analyzeImage() {
+        const fileInput = document.getElementById('imageInput');
+        if (fileInput.files.length === 0) { alert("사진 파일을 선택해주세요!"); return; }
+
+        const formData = new FormData();
+        formData.append("file", fileInput.files[0]);
+
+        document.getElementById('imageResultArea').innerText = "📸 구글 비전이 글자를 읽고 AI가 분석 중입니다... (잠시만 기다려주세요)";
+        document.getElementById('ocrText').style.display = 'none';
+
+        fetch('/api/v1/image', { method: 'POST', body: formData })
+            .then(response => response.json())
+            .then(data => {
+                if(data.error) {
+                    document.getElementById('imageResultArea').innerText = data.error;
+                } else {
+                    // 구글 비전이 뽑아낸 글자 보여주기
+                    document.getElementById('ocrText').innerText = "📝 [사진에서 추출된 글자]\n" + data.extractedText;
+                    document.getElementById('ocrText').style.display = 'block';
+
+                    // OpenAI 분석 결과 보여주기
+                    document.getElementById('imageResultArea').innerText = "🤖 [AI 수사관 분석 결과]\n\n" + data.aiResult;
+
+                    // 평가 버튼 띄우기
+                    document.getElementById('evaluationSection').style.display = 'block';
+                    loadStats();
+                }
+            })
+            .catch(err => document.getElementById('imageResultArea').innerText = "분석 실패: " + err);
+    }
+
+    // 4. 솔루션 평가
+    function sendFeedback(isHelpful) {
+        fetch(`/api/v1/chat/feedback?id=${lastAnalysisId}&helpful=${isHelpful}`, { method: 'POST' })
+            .then(response => response.text())
+            .then(msg => {
+                alert(msg);
+                loadStats();
+            });
+    }
+
+    // 5. 통계 로딩
+    function loadStats() {
+        fetch('/api/v1/phishing/stats')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('totalCount').innerText = data.totalAnalyses;
+                document.getElementById('helpfulCount').innerText = data.helpfulCount;
+                document.getElementById('satisfactionRate').innerText = data.satisfactionRate.toFixed(1);
+            });
+    }
+
+    window.onload = loadStats;
+</script>
+
+</body>
+</html>
